@@ -2,15 +2,12 @@
 """
 Fitkofer Kalkulator Obroka — Streamlit mini-app
 Python 3.12+
-Dodatno: Obroci (Doručak/Ručak/Večera...), datum, izvoz po danu,
-zbir po obroku, Sačuvaj/Učitaj sesiju (JSON).
+Verzija: obroci + datum + CSV izvoz (bez JSON sesije i bez snimanja u data/logs)
 """
 
 from __future__ import annotations
-import os
-import json
 from pathlib import Path
-from datetime import datetime, date
+from datetime import datetime
 from typing import Any, Dict
 
 import pandas as pd
@@ -34,18 +31,17 @@ ROOT = Path(__file__).parent.resolve()
 DATA_DIR = ROOT / "data"
 FOODS_CSV = DATA_DIR / "foods.csv"
 MY_FOODS_CSV = DATA_DIR / "my_foods.csv"
-LOGS_DIR = DATA_DIR / "logs"
 
 REQUIRED_COLUMNS = ["namirnica", "kcal_100g", "protein_100g", "mast_100g", "uh_100g", "izvor"]
 
-# Lista obroka (možeš menjati redosled/tekst)
+# Lista obroka (slobodno menjaj)
 MEAL_OPTIONS = ["Doručak", "Užina 1", "Ručak", "Užina 2", "Večera"]
 
 # READ_ONLY: True = sakrivena sekcija "Moja namirnica" (za cloud),
 # False = vidiš je lokalno i možeš da dodaješ.
 READ_ONLY = True
 
-# Ako dodaš lozinku kroz secrets (APP_PASSWORD), tražiće se na ulazu:
+# (Opcionalno) Jednostavna lozinka preko Streamlit "secrets"
 if "APP_PASSWORD" in st.secrets:
     pwd = st.text_input("Lozinka za pristup", type="password")
     if pwd != st.secrets["APP_PASSWORD"]:
@@ -56,7 +52,6 @@ if "APP_PASSWORD" in st.secrets:
 # ----------------------------
 def ensure_directories_and_files():
     DATA_DIR.mkdir(parents=True, exist_ok=True)
-    LOGS_DIR.mkdir(parents=True, exist_ok=True)
     if not MY_FOODS_CSV.exists():
         pd.DataFrame(columns=REQUIRED_COLUMNS).to_csv(MY_FOODS_CSV, index=False, encoding="utf-8")
     if not FOODS_CSV.exists():
@@ -138,7 +133,7 @@ init_session_state()
 st.sidebar.title("🍎 Fitkofer — 30 Dana Discipline")
 st.sidebar.markdown(
     "Prati unos kalorija i makroa po obroku **i po danu**. "
-    "Unos radiš u gramima; vrednosti su na **100 g**. "
+    "Unosiš grame; vrednosti su na **100 g**. "
     "Biljni proteini su 0 u bazi (po pravilu programa)."
 )
 daily_target = st.sidebar.text_input("Dnevni kalorijski cilj (kcal) — opcionalno", value="")
@@ -154,7 +149,7 @@ st.sidebar.caption(
 # Glavni sadržaj
 # ----------------------------
 st.title("Fitkofer Kalkulator Obroka")
-st.write("Unesi obrok po obrok, beleži grame, i sačuvaj dnevnik kao CSV. Po želji sačuvaj/učitaj sesiju (JSON).")
+st.write("Unesi obrok po obrok, beleži grame, i preuzmi dnevnik kao CSV za izabrani datum.")
 
 foods = load_food_db()
 
@@ -177,7 +172,13 @@ with col_left:
     search = st.text_input("Pretraga namirnica (piši deo naziva)", value="")
     filtered = foods[foods["namirnica"].str.contains(search, case=False, na=False)] if search else foods
     options = filtered["namirnica"].tolist()
-    selected = st.selectbox("Izaberi namirnicu", options, index=0 if options else None, placeholder="npr. Pileća prsa")
+
+    if not options:
+        st.warning("⚠️ Baza je prazna ili nema poklapanja za pretragu.")
+        selected = None
+    else:
+        selected = st.selectbox("Izaberi namirnicu", options, index=0)
+
     grams_str = st.text_input("Količina (g)", value="100")
 
     add_btn = st.button("Dodaj u dnevnik", type="primary", use_container_width=True)
@@ -219,7 +220,7 @@ with col_left:
 
     st.markdown("---")
 
-    # Sekcija "Moja namirnica" (sakriveno na cloudu)
+    # Sekcija "Moja namirnica" (isključena za cloud)
     if not READ_ONLY:
         st.subheader("🆕 Dodaj *moju* namirnicu (na 100 g)")
         mf_col1, mf_col2 = st.columns(2)
@@ -254,7 +255,7 @@ with col_left:
                 st.success(f"✅ Dodato u 'Moje namirnice': {mf_name.strip()}")
                 foods = load_food_db()
     else:
-        st.caption("ℹ️ Sekcija **„Moja namirnica“** je isključena na ovom linku. Ako ti treba dodavanje, radi lokalno (READ_ONLY=False).")
+        st.caption("ℹ️ Sekcija **„Moja namirnica“** je isključena na ovom linku. Ako treba dodavanje, radi lokalno (READ_ONLY=False).")
 
 # ---- Desna kolona: Pregled / izvoz ----
 with col_right:
@@ -262,7 +263,6 @@ with col_right:
 
     if st.session_state["log"]:
         df_log = pd.DataFrame(st.session_state["log"])
-        # Filtriraj na izabrani datum (današnji pregled)
         today_str = st.session_state["current_date"].isoformat()
         today_mask = df_log["datum"] == today_str
         df_today = df_log.loc[today_mask, ["datum", "obrok", "namirnica", "grami", "kcal", "protein", "mast", "uh"]].copy()
@@ -293,39 +293,13 @@ with col_right:
             ax.set_ylabel("grami")
             st.pyplot(fig, use_container_width=True)
 
-            # Izvoz (CSV za današnji dan)
+            # Izvoz (CSV za današnji dan) — JEDINO dugme
             default_name = f"dnevnik_{today_str}.csv"
             export_name = st.text_input("Naziv fajla za izvoz (CSV)", value=default_name)
             csv_bytes = df_today.to_csv(index=False, encoding="utf-8").encode("utf-8")
             st.download_button("⬇️ Preuzmi dnevnik (CSV)", data=csv_bytes, file_name=export_name, mime="text/csv", use_container_width=True)
 
-            if st.button("💾 Sačuvaj dnevnik u data/logs", use_container_width=True):
-                out_path = LOGS_DIR / export_name
-                df_today.to_csv(out_path, index=False, encoding="utf-8")
-                st.success(f"Sačuvano: {out_path}")
-
-        # Sačuvaj/učitaj SESIJU (sve stavke, svi datumi) — lokalno kod korisnika
-        st.markdown("---")
-        st.markdown("### 🔄 Sačuvaj / učitaj sesiju (bez naloga)")
-        session_json = json.dumps(st.session_state["log"], ensure_ascii=False, indent=2)
-        st.download_button(
-            "💾 Preuzmi sesiju (JSON)",
-            data=session_json.encode("utf-8"),
-            file_name=f"sesija_{today_str}.json",
-            mime="application/json",
-            use_container_width=True,
-        )
-        uploaded = st.file_uploader("Učitaj sesiju (JSON)", type=["json"])
-        if uploaded is not None:
-            try:
-                loaded = json.loads(uploaded.read().decode("utf-8"))
-                if isinstance(loaded, list):
-                    st.session_state["log"].extend(loaded)
-                    st.success(f"Učitano {len(loaded)} stavki u sesiju.")
-                else:
-                    st.warning("Fajl nije u očekivanom formatu (lista).")
-            except Exception as e:
-                st.error(f"Greška pri učitavanju: {e}")
+            st.caption("💡 Savet: čuvaj CSV na kraju dana ili posle svakog obroka po želji.")
     else:
         st.info("Dnevnik je prazan. Dodaj prvu namirnicu sa leve strane.")
 
