@@ -11,7 +11,6 @@ Jabuka,60,0,0,14,USDA
 Jaja,150,12.3,10.3,0,USDA
 Jaja belanca,48,10,0,0,USDA
 Kikiriki puter,647,0,58.9,15.7,Proizvod
-Krompir kuvan,80,0,0,18,USDA
 Kupus kiseo,20,0,0,4,USDA
 Kupus svež,30,0,0,6,USDA
 Lešnici,640,0,53,26,USDA
@@ -26,8 +25,8 @@ Mlevena junetina (standard),250,17.5,19.4,0,USDA
 Ovsene pahuljice,329,0,2.4,60,Proizvod
 Orasi,640,0,69,11,USDA
 Pasirani paradajz,25,0,0,5,Proizvod
-Pileća prsa bez kože,120,22.5,2,0,USDA
-Pileće butkice bez kože,180,20,10,0,USDA
+Pileća prsa bez kože (sveza),120,22.5,2,0,USDA
+Pileće butkice bez kože (sveze),180,20,10,0,USDA
 Pirinač kuvani,359,0,0,80,USDA
 Pšenični griz,354,0,0,77,USDA
 Sardine u sopstvenom soku,143,20,4,0,Proizvod
@@ -42,3 +41,7 @@ Whey protein,377,75,5.6,6.6,Proizvod
 Maslac,750,0,82,0,Proizvod
 Nektarine,43,0,0,9.4,USDA
 Kackavalj,339,27.8,25,0
+Orah,730,0,70,10
+Krompir (svez),72,0,0,16
+Piletina (kuvana),166,32,3,0
+Beli Hleb kupljeni,270,0,3,50
